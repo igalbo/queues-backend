@@ -3,10 +3,15 @@ POST http://localhost:3000/api/my_queue
 Content-Type: application/json
 
 {
-    "message": "Hello, RabbitMQ!"
+    "message": "5"
 }
 
 ###
 
 # GET a message from the RabbitMQ queue with a 5-second timeout
-GET http://localhost:3000/api/my_queue?timeout=1000
+GET http://localhost:3000/api/my_queue?timeout=3000
+###
+
+GET http://localhost:3000/api/queues
+
+###

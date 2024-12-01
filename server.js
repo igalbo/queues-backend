@@ -2,9 +2,13 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const amqplib = require("amqplib");
+const cors = require("cors");
 
+// Allow requests from the React app's origin
 const app = express();
 const port = process.env.PORT || 3000;
+
+app.use(cors());
 
 app.use(bodyParser.json());
 
@@ -17,6 +21,21 @@ async function initializeRabbitMQ() {
   connection = await amqplib.connect(RABBITMQ_URL);
   channel = await connection.createChannel();
 }
+
+app.get("/api/queues", async (req, res) => {
+  try {
+    // This gets all queues in the default virtual host
+    const queues = await channel.assertQueue("");
+
+    // Get the list of all queues
+    const queuesList = await channel.checkQueue(queues.queue);
+
+    res.status(200).json(queuesList);
+  } catch (error) {
+    console.error("Error getting queues:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 app.post("/api/:queue_name", async (req, res) => {
   const { queue_name } = req.params;

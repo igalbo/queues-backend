@@ -34,21 +34,45 @@ app.post("/api/:queue_name", async (req, res) => {
 
 app.get("/api/:queue_name", async (req, res) => {
   const { queue_name } = req.params;
+  const timeout = parseInt(req.query.timeout, 10) || DEFAULT_TIMEOUT;
 
   try {
-    // Ensure the queue exists
     await channel.assertQueue(queue_name);
 
-    // Get a single message from the queue
-    const msg = await channel.get(queue_name, { noAck: false });
+    // Poll for a message with a timeout
+    const message = await new Promise((resolve) => {
+      let resolved = false;
 
-    if (msg) {
-      // Acknowledge the message after retrieval
-      channel.ack(msg);
-      // Send the message content as the response
-      res.status(200).json(JSON.parse(msg.content.toString()));
+      // Timer to return if no message is found within the timeout
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve(null); // No message found within the timeout
+        }
+      }, timeout);
+
+      // Poll for a message
+      const poll = () => {
+        channel.get(queue_name, { noAck: false }).then((msg) => {
+          if (msg && !resolved) {
+            resolved = true;
+            clearTimeout(timer); // Cancel the timeout
+            resolve(msg); // Return the message
+          } else if (!resolved) {
+            setTimeout(poll, 100); // Retry polling after 100ms
+          }
+        });
+      };
+
+      poll(); // Start polling
+    });
+
+    if (message) {
+      // Acknowledge the message and send it in the response
+      channel.ack(message);
+      res.status(200).json(JSON.parse(message.content.toString()));
     } else {
-      // No messages in the queue
+      // Return 204 if no message is found
       res.status(204).send();
     }
   } catch (error) {

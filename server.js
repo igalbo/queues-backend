@@ -34,27 +34,21 @@ app.post("/api/:queue_name", async (req, res) => {
 
 app.get("/api/:queue_name", async (req, res) => {
   const { queue_name } = req.params;
-  const timeout = parseInt(req.query.timeout, 10) || DEFAULT_TIMEOUT;
 
   try {
+    // Ensure the queue exists
     await channel.assertQueue(queue_name);
-    const message = await new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), timeout);
 
-      channel.consume(
-        queue_name,
-        (msg) => {
-          clearTimeout(timer);
-          resolve(msg);
-          channel.ack(msg);
-        },
-        { noAck: false }
-      );
-    });
+    // Get a single message from the queue
+    const msg = await channel.get(queue_name, { noAck: false });
 
-    if (message) {
-      res.status(200).json(JSON.parse(message.content.toString()));
+    if (msg) {
+      // Acknowledge the message after retrieval
+      channel.ack(msg);
+      // Send the message content as the response
+      res.status(200).json(JSON.parse(msg.content.toString()));
     } else {
+      // No messages in the queue
       res.status(204).send();
     }
   } catch (error) {
